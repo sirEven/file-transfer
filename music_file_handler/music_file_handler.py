@@ -11,7 +11,7 @@ import re
 from dotenv import load_dotenv
 
 # TODO: Implement recursive folder handling (if not yet covered by watchdog)
-
+# TODO: Make bigger files work as well - e.g.: Podcasts.
 # Load environment variables
 load_dotenv()
 
