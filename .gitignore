@@ -17,3 +17,4 @@ wheels/
 
 # Logs
 logs/*
+.DS_Store
