@@ -238,34 +238,46 @@ class MusicFileHandler(FileSystemEventHandler):
                         f"mtime={time.ctime(file_stats.st_mtime)}"
                     )
 
-                # Transfer file to remote destination
-                if DEBUG:
-                    logger.info(f"Executing SCP command for: {file_path}")
-                scp_command = ["scp", file_path, f"{DEST_USER}@{DEST_HOST}:{DEST_DIR}"]
-                with open(os.devnull, "w") as devnull:
+                # Transfer file to remote destination with retries
+                max_retries = 3
+                retry_delay = 5  # seconds
+                for attempt in range(max_retries):
+                    if DEBUG:
+                        logger.info(f"Executing SCP command for: {file_path} (attempt {attempt + 1}/{max_retries})")
+                    scp_command = ["scp", "-o", "StrictHostKeyChecking=no", file_path, f"{DEST_USER}@{DEST_HOST}:{DEST_DIR}"]
                     process = subprocess.Popen(
                         scp_command,
                         stdout=subprocess.PIPE,
-                        stderr=devnull,
+                        stderr=subprocess.PIPE,
                         text=True,
                     )
-                # Stream progress bar to console
-                # FIXME: Currently broken, don't care atm.
-                progress_pattern = re.compile(
-                    r"^\S+\s+\d+%\s+\S+\s+\d{2}:\d{2}$"
-                )  # Matches "filename XX% YYYKB/s ZZ:ZZ"
-                while process.poll() is None:
-                    output = process.stdout.readline()
-                    if output and progress_pattern.match(output.strip()):
-                        print(output.strip(), end="\r")
-                returncode = process.wait()
-                if returncode != 0:
-                    raise subprocess.CalledProcessError(returncode, scp_command)
-                print()  # Newline after progress bar
-                if DEBUG:
-                    logger.info(
-                        f"SCP completed for: {file_path}, returncode={returncode}"
-                    )
+                    # Stream progress bar to console
+                    # FIXME: Currently broken, don't care atm.
+                    progress_pattern = re.compile(
+                        r"^\S+\s+\d+%\s+\S+\s+\d{2}:\d{2}$"
+                    )  # Matches "filename XX% YYYKB/s ZZ:ZZ"
+                    while process.poll() is None:
+                        output = process.stdout.readline()
+                        if output and progress_pattern.match(output.strip()):
+                            print(output.strip(), end="\r")
+                    returncode = process.wait()
+                    stderr_output = process.stderr.read()
+                    if returncode == 0:
+                        print()  # Newline after progress bar
+                        if DEBUG:
+                            logger.info(
+                                f"SCP completed for: {file_path}, returncode={returncode}"
+                            )
+                        break  # Success, exit retry loop
+                    else:
+                        if DEBUG:
+                            logger.error(f"SCP failed for {file_path} on attempt {attempt + 1}: returncode={returncode}, stderr={stderr_output.strip()}")
+                        if attempt < max_retries - 1:
+                            if DEBUG:
+                                logger.info(f"Retrying SCP for {file_path} in {retry_delay} seconds...")
+                            time.sleep(retry_delay)
+                        else:
+                            raise subprocess.CalledProcessError(returncode, scp_command, stderr_output)
 
                 # Move file to Processed folder
                 if DEBUG:
