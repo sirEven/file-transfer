@@ -10,6 +10,7 @@ import time
 import re
 from dotenv import load_dotenv
 
+# TODO: Rewrite this script "in maintainable" 🦾🤖...
 # TODO: Implement recursive folder handling (if not yet covered by watchdog)
 # TODO: Make bigger files work as well - e.g.: Podcasts.
 # Load environment variables
@@ -243,8 +244,16 @@ class MusicFileHandler(FileSystemEventHandler):
                 retry_delay = 5  # seconds
                 for attempt in range(max_retries):
                     if DEBUG:
-                        logger.info(f"Executing SCP command for: {file_path} (attempt {attempt + 1}/{max_retries})")
-                    scp_command = ["scp", "-o", "StrictHostKeyChecking=no", file_path, f"{DEST_USER}@{DEST_HOST}:{DEST_DIR}"]
+                        logger.info(
+                            f"Executing SCP command for: {file_path} (attempt {attempt + 1}/{max_retries})"
+                        )
+                    scp_command = [
+                        "scp",
+                        "-o",
+                        "StrictHostKeyChecking=no",
+                        file_path,
+                        f"{DEST_USER}@{DEST_HOST}:{DEST_DIR}",
+                    ]
                     process = subprocess.Popen(
                         scp_command,
                         stdout=subprocess.PIPE,
@@ -271,13 +280,19 @@ class MusicFileHandler(FileSystemEventHandler):
                         break  # Success, exit retry loop
                     else:
                         if DEBUG:
-                            logger.error(f"SCP failed for {file_path} on attempt {attempt + 1}: returncode={returncode}, stderr={stderr_output.strip()}")
+                            logger.error(
+                                f"SCP failed for {file_path} on attempt {attempt + 1}: returncode={returncode}, stderr={stderr_output.strip()}"
+                            )
                         if attempt < max_retries - 1:
                             if DEBUG:
-                                logger.info(f"Retrying SCP for {file_path} in {retry_delay} seconds...")
+                                logger.info(
+                                    f"Retrying SCP for {file_path} in {retry_delay} seconds..."
+                                )
                             time.sleep(retry_delay)
                         else:
-                            raise subprocess.CalledProcessError(returncode, scp_command, stderr_output)
+                            raise subprocess.CalledProcessError(
+                                returncode, scp_command, stderr_output
+                            )
 
                 # Move file to Processed folder
                 if DEBUG:
