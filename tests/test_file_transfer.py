@@ -23,7 +23,7 @@ def test_stop_leads_to_correct_state(file_transfer: FileTransfer) -> None:
 
     assert not ft.running
 
-    deadline = time.time() + 12.0
+    deadline = time.time() + 5.0
     while ft.observer.is_alive() and time.time() < deadline:
         time.sleep(0.2)
 

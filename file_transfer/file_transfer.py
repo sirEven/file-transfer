@@ -1,9 +1,11 @@
 from pathlib import Path
+from typing import List
 
-from watchdog.events import FileSystemEventHandler
+from watchdog.events import FileSystemEventHandler, FileSystemEvent
 import shutil
 import os
 import subprocess
+from queue import Queue
 from watchdog.observers import Observer
 from watchdog.observers.api import EventDispatcher
 import logging
@@ -15,7 +17,8 @@ from dotenv import load_dotenv
 
 # TODO: Rewrite this script "in maintainable" 🦾🤖...
 # TODO: Implement recursive folder handling (if not yet covered by watchdog)
-# TODO: Make bigger files work as well - e.g.: Podcasts.
+# TODO: Make bigger files work as well - e.g.: Podcasts.bb
+
 # Load environment variables
 load_dotenv()
 
@@ -51,11 +54,12 @@ logger = logging.getLogger()
 
 class FileTransfer(FileSystemEventHandler):
     def __init__(self):
+        assert SOURCE_DIR
         self.observer = Observer()
         self.observer.schedule(self, SOURCE_DIR, recursive=False)
-        self.file_queue = queue.Queue()
-        self.queued_files = set()  # Track files already in queue
-        self.processed_files = set()  # Track fully processed files
+        self.file_queue: Queue[Path] = Queue()
+        self.queued_files: set[Path] = set()  # Track files already in queue
+        self.processed_files: set[Path] = set()  # Track fully processed files
         self.running = False
         self.transfer_lock = threading.Lock()  # Lock for transfer_file
         self.queue_lock = threading.Lock()  # Lock for queue operations
@@ -98,7 +102,7 @@ class FileTransfer(FileSystemEventHandler):
         if DEBUG:
             logger.info("Stopping file transfer daemon")
 
-    def on_any_event(self, event):
+    def on_any_event(self, event: FileSystemEvent):
         # Skip logging for .DS_Store and directory events
         if os.path.basename(event.src_path) == ".DS_Store" or event.is_directory:
             return
@@ -107,11 +111,12 @@ class FileTransfer(FileSystemEventHandler):
                 f"Event detected: type={event.event_type}, path={event.src_path}, is_directory={event.is_directory}"
             )
 
-    def on_created(self, event):
+    def on_created(self, event: FileSystemEvent):
         if event.is_directory or os.path.basename(event.src_path) == ".DS_Store":
             return
         # Ignore files in PROCESSED_DIR
-        if event.src_path.startswith(PROCESSED_DIR):
+        assert PROCESSED_DIR
+        if Path(str(event.src_path)).is_relative_to(Path(PROCESSED_DIR)):
             if DEBUG:
                 logger.info(f"Ignored file in processed directory: {event.src_path}")
             return
@@ -122,26 +127,30 @@ class FileTransfer(FileSystemEventHandler):
             # Deduplicate before adding to queue
             with self.queue_lock:
                 if (
-                    event.src_path in self.queued_files
-                    or event.src_path in self.processed_files
+                    Path(str(event.src_path)) in self.queued_files
+                    or Path(str(event.src_path)) in self.processed_files
                 ):
                     if DEBUG:
                         logger.info(
                             f"Skipped duplicate queue attempt: {event.src_path}"
                         )
                 else:
-                    self.queued_files.add(event.src_path)
-                    self.file_queue.put(event.src_path)
+                    self.queued_files.add(Path(str(event.src_path)))
+                    self.file_queue.put(Path(str(event.src_path)))
                     if DEBUG:
                         logger.info(f"Queued file for processing: {event.src_path}")
         elif DEBUG:
             logger.info(f"Ignored file with invalid extension: {event.src_path}")
 
-    def on_moved(self, event):
+    def on_moved(self, event: FileSystemEvent):
         if event.is_directory or os.path.basename(event.dest_path) == ".DS_Store":
             return
         # Ignore files moved to PROCESSED_DIR
-        if event.dest_path.startswith(PROCESSED_DIR):
+        assert PROCESSED_DIR
+        dest_path_str = str(
+            event.dest_path
+        )  # TODO: change startswith to is_relative_to as well.
+        if Path(dest_path_str).is_relative_to(Path(PROCESSED_DIR)):
             if DEBUG:
                 logger.info(
                     f"Ignored file moved to processed directory: {event.dest_path}"
@@ -156,16 +165,16 @@ class FileTransfer(FileSystemEventHandler):
             # Deduplicate before adding to queue
             with self.queue_lock:
                 if (
-                    event.dest_path in self.queued_files
-                    or event.dest_path in self.processed_files
+                    Path(str(event.dest_path)) in self.queued_files
+                    or Path(str(event.dest_path)) in self.processed_files
                 ):
                     if DEBUG:
                         logger.info(
                             f"Skipped duplicate queue attempt for renamed file: {event.dest_path}"
                         )
                 else:
-                    self.queued_files.add(event.dest_path)
-                    self.file_queue.put(event.dest_path)
+                    self.queued_files.add(Path(str(event.dest_path)))
+                    self.file_queue.put(Path(str(event.dest_path)))
                     if DEBUG:
                         logger.info(
                             f"Queued renamed file for processing: {event.dest_path}"
@@ -212,7 +221,7 @@ class FileTransfer(FileSystemEventHandler):
                 if DEBUG:
                     logger.error(f"Error in queue processing: {str(e)}")
 
-    def transfer_file(self, file_path):
+    def transfer_file(self, file_path: Path):
         with self.transfer_lock:  # Ensure exclusive execution
             try:
                 if file_path in self.processed_files:
@@ -260,7 +269,7 @@ class FileTransfer(FileSystemEventHandler):
                         logger.info(
                             f"Executing SCP command for: {file_path} (attempt {attempt + 1}/{max_retries})"
                         )
-                    scp_command = [
+                    scp_command: List[str | Path] = [
                         "scp",
                         "-o",
                         "StrictHostKeyChecking=no",
@@ -279,10 +288,12 @@ class FileTransfer(FileSystemEventHandler):
                         r"^\S+\s+\d+%\s+\S+\s+\d{2}:\d{2}$"
                     )  # Matches "filename XX% YYYKB/s ZZ:ZZ"
                     while process.poll() is None:
+                        assert process.stdout
                         output = process.stdout.readline()
                         if output and progress_pattern.match(output.strip()):
                             print(output.strip(), end="\r")
                     returncode = process.wait()
+                    assert process.stderr
                     stderr_output = process.stderr.read()
                     if returncode == 0:
                         print()  # Newline after progress bar
@@ -310,9 +321,9 @@ class FileTransfer(FileSystemEventHandler):
                 # Move file to Processed folder
                 if DEBUG:
                     logger.info(f"Moving file to Processed: {file_path}")
-                os.makedirs(PROCESSED_DIR, exist_ok=True)
+                os.makedirs(Path(str(PROCESSED_DIR)), exist_ok=True)
                 processed_path = os.path.join(
-                    PROCESSED_DIR, os.path.basename(file_path)
+                    str(PROCESSED_DIR), os.path.basename(file_path)
                 )
                 shutil.move(file_path, processed_path)
                 if DEBUG:
