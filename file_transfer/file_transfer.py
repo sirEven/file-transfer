@@ -27,7 +27,7 @@ SOURCE_DIR = os.getenv("SOURCE_DIR")
 DEST_USER = os.getenv("DEST_USER")
 DEST_HOST = os.getenv("DEST_HOST")
 DEST_DIR = os.getenv("DEST_DIR")
-PROCESSED_DIR = os.getenv("PROCESSED_DIR")
+TRANSFERRED_DIR = os.getenv("TRANSFERRED_DIR")
 LOG_FILE = os.getenv("LOG_FILE")
 
 # TODO: If this location does not exist, we need to create it here
@@ -59,7 +59,7 @@ class FileTransfer(FileSystemEventHandler):
         self.observer.schedule(self, SOURCE_DIR, recursive=False)
         self.file_queue: Queue[Path] = Queue()
         self.queued_files: set[Path] = set()  # Track files already in queue
-        self.processed_files: set[Path] = set()  # Track fully processed files
+        self.transferred_files: set[Path] = set()  # Track fully transferred files
         self.running = False
         self.transfer_lock = threading.Lock()  # Lock for transfer_file
         self.queue_lock = threading.Lock()  # Lock for queue operations
@@ -92,7 +92,7 @@ class FileTransfer(FileSystemEventHandler):
                 except queue.Empty:
                     break
             self.queued_files.clear()
-            self.processed_files.clear()
+            self.transferred_files.clear()
         try:
             self.observer.join(timeout=5.0)
             self.queue_thread.join(timeout=5.0)
@@ -114,11 +114,11 @@ class FileTransfer(FileSystemEventHandler):
     def on_created(self, event: FileSystemEvent):
         if event.is_directory or os.path.basename(event.src_path) == ".DS_Store":
             return
-        # Ignore files in PROCESSED_DIR
-        assert PROCESSED_DIR
-        if Path(str(event.src_path)).is_relative_to(Path(PROCESSED_DIR)):
+        # Ignore files in TRANSFERRED_DIR
+        assert TRANSFERRED_DIR
+        if Path(str(event.src_path)).is_relative_to(Path(TRANSFERRED_DIR)):
             if DEBUG:
-                logger.info(f"Ignored file in processed directory: {event.src_path}")
+                logger.info(f"Ignored file in transferred directory: {event.src_path}")
             return
         # Check if file has a valid extension
         if os.path.splitext(event.src_path)[1].lower() in VALID_EXTENSIONS:
@@ -128,7 +128,7 @@ class FileTransfer(FileSystemEventHandler):
             with self.queue_lock:
                 if (
                     Path(str(event.src_path)) in self.queued_files
-                    or Path(str(event.src_path)) in self.processed_files
+                    or Path(str(event.src_path)) in self.transferred_files
                 ):
                     if DEBUG:
                         logger.info(
@@ -145,15 +145,15 @@ class FileTransfer(FileSystemEventHandler):
     def on_moved(self, event: FileSystemEvent):
         if event.is_directory or os.path.basename(event.dest_path) == ".DS_Store":
             return
-        # Ignore files moved to PROCESSED_DIR
-        assert PROCESSED_DIR
+        # Ignore files moved to TRANSFERRED_DIR
+        assert TRANSFERRED_DIR
         dest_path_str = str(
             event.dest_path
         )  # TODO: change startswith to is_relative_to as well.
-        if Path(dest_path_str).is_relative_to(Path(PROCESSED_DIR)):
+        if Path(dest_path_str).is_relative_to(Path(TRANSFERRED_DIR)):
             if DEBUG:
                 logger.info(
-                    f"Ignored file moved to processed directory: {event.dest_path}"
+                    f"Ignored file moved to transferred directory: {event.dest_path}"
                 )
             return
         # Check if the new path has a valid extension
@@ -166,7 +166,7 @@ class FileTransfer(FileSystemEventHandler):
             with self.queue_lock:
                 if (
                     Path(str(event.dest_path)) in self.queued_files
-                    or Path(str(event.dest_path)) in self.processed_files
+                    or Path(str(event.dest_path)) in self.transferred_files
                 ):
                     if DEBUG:
                         logger.info(
@@ -192,10 +192,10 @@ class FileTransfer(FileSystemEventHandler):
                     file_path = self.file_queue.get(timeout=1)
                     if DEBUG:
                         logger.info(f"Dequeued file for processing: {file_path}")
-                    if file_path in self.processed_files:
+                    if file_path in self.transferred_files:
                         if DEBUG:
                             logger.info(
-                                f"File already fully processed, skipping: {file_path}"
+                                f"File already transferred, skipping: {file_path}"
                             )
                         self.file_queue.task_done()
                         continue
@@ -213,7 +213,7 @@ class FileTransfer(FileSystemEventHandler):
                         if DEBUG:
                             logger.info(f"Marking task done for: {file_path}")
                         self.queued_files.discard(file_path)
-                        self.processed_files.add(file_path)
+                        self.transferred_files.add(file_path)
                         self.file_queue.task_done()
             except queue.Empty:
                 continue
@@ -224,14 +224,14 @@ class FileTransfer(FileSystemEventHandler):
     def transfer_file(self, file_path: Path):
         with self.transfer_lock:  # Ensure exclusive execution
             try:
-                if file_path in self.processed_files:
+                if file_path in self.transferred_files:
                     if DEBUG:
-                        logger.info(f"File already processed, skipping: {file_path}")
+                        logger.info(f"File already transferred, skipping: {file_path}")
                     return
                 # Check if file still exists
                 if not os.path.exists(file_path):
                     if DEBUG:
-                        logger.info(f"File already processed or removed: {file_path}")
+                        logger.info(f"File already transferred or removed: {file_path}")
                     return
 
                 # Wait for file stability (size stops changing)
@@ -318,16 +318,16 @@ class FileTransfer(FileSystemEventHandler):
                                 returncode, scp_command, stderr_output
                             )
 
-                # Move file to Processed folder
+                # Move file to transferred folder
                 if DEBUG:
-                    logger.info(f"Moving file to Processed: {file_path}")
-                os.makedirs(Path(str(PROCESSED_DIR)), exist_ok=True)
-                processed_path = os.path.join(
-                    str(PROCESSED_DIR), os.path.basename(file_path)
+                    logger.info(f"Moving file to transferred: {file_path}")
+                os.makedirs(Path(str(TRANSFERRED_DIR)), exist_ok=True)
+                transferred_path = os.path.join(
+                    str(TRANSFERRED_DIR), os.path.basename(file_path)
                 )
-                shutil.move(file_path, processed_path)
+                shutil.move(file_path, transferred_path)
                 if DEBUG:
-                    logger.info(f"Moved {file_path} to {processed_path}")
+                    logger.info(f"Moved {file_path} to {transferred_path}")
             except Exception as e:
                 if DEBUG:
                     logger.error(f"Error processing {file_path}: {str(e)}")

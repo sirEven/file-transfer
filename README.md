@@ -1,5 +1,5 @@
 # File Transfer
-This is a small script to obvserve a source folder for new files (with watchdog) and transfer files to a remote destination when they show up fresh in the source folder. Once the script is done with a file, it is moved into the `Processed` subdirectory.
+This is a small script to obvserve a source folder for new files (with watchdog) and transfer files to a remote destination when they show up fresh in the source folder. Once the script is done with a file, it is moved into the `transferred` subdirectory.
 
 ## Usage
 1) Fill in all the required variables in the .env file
