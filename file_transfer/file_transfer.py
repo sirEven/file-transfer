@@ -1,8 +1,11 @@
+from pathlib import Path
+
 from watchdog.events import FileSystemEventHandler
 import shutil
 import os
 import subprocess
 from watchdog.observers import Observer
+from watchdog.observers.api import EventDispatcher
 import logging
 import queue
 import threading
@@ -23,6 +26,15 @@ DEST_HOST = os.getenv("DEST_HOST")
 DEST_DIR = os.getenv("DEST_DIR")
 PROCESSED_DIR = os.getenv("PROCESSED_DIR")
 LOG_FILE = os.getenv("LOG_FILE")
+
+# TODO: If this location does not exist, we need to create it here
+if LOG_FILE:
+    log_path = Path(LOG_FILE)
+    log_dir = log_path.parent  # everything except the filename
+
+    if not log_dir.exists():
+        log_dir.mkdir(parents=True, exist_ok=True)
+
 VALID_EXTENSIONS = {
     f".{ext.lower()}" for ext in os.getenv("VALID_EXTENSIONS", "").split(",") if ext
 }
@@ -63,6 +75,7 @@ class FileTransfer(FileSystemEventHandler):
         try:
             self.observer.unschedule_all()
             self.observer.stop()
+            self.observer.event_queue.put(EventDispatcher.stop_event)
         except Exception as e:
             if DEBUG:
                 logger.error(f"Error stopping observer: {str(e)}")
