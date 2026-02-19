@@ -5,7 +5,7 @@ import logging
 from dotenv import load_dotenv
 import os
 
-from music_file_handler.music_file_handler import MusicFileHandler
+from file_transfer.file_transfer import FileTransfer
 
 # Load environment variables
 load_dotenv()
@@ -37,7 +37,7 @@ def main():
         import watchdog  # TODO: Clean up.
 
     # Create observer and event handler
-    music_file_handler = MusicFileHandler()
+    music_file_handler = FileTransfer()
     try:
         music_file_handler.start()  # Start the observer
         if DEBUG:

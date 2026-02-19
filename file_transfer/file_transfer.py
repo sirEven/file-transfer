@@ -37,7 +37,7 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 
-class MusicFileHandler(FileSystemEventHandler):
+class FileTransfer(FileSystemEventHandler):
     def __init__(self):
         self.observer = Observer()
         self.observer.schedule(self, SOURCE_DIR, recursive=False)
