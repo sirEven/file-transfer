@@ -41,6 +41,7 @@ if LOG_FILE:
 VALID_EXTENSIONS = {
     f".{ext.lower()}" for ext in os.getenv("VALID_EXTENSIONS", "").split(",") if ext
 }
+
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
 # Set up logging (file only, disabled in production)
@@ -103,7 +104,7 @@ class FileTransfer(FileSystemEventHandler):
             logger.info("Stopping file transfer daemon")
 
     def on_any_event(self, event: FileSystemEvent):
-        # Skip logging for .DS_Store and directory events
+        # Skip logging for .DS_Store and directory events # TODO: We should create a List of ignored extensions ow which .DS_Store is one. Also we need to determine platform and select that list accordingly
         if os.path.basename(event.src_path) == ".DS_Store" or event.is_directory:
             return
         if DEBUG:
