@@ -17,8 +17,8 @@ from dotenv import load_dotenv
 
 # TODO: Rewrite this script "in maintainable" 🦾🤖...
 # TODO: Implement recursive folder handling (if not yet covered by watchdog)
-# TODO: Make bigger files work as well - e.g.: Podcasts.bb
-
+# TODO: Make bigger files work as well - e.g.: Podcasts.
+# TODO: Split .env up into a config file and true .env values
 # Load environment variables
 load_dotenv()
 
@@ -160,9 +160,7 @@ class FileTransfer(FileSystemEventHandler):
             return
         # Ignore files moved to TRANSFERRED_DIR
         assert TRANSFERRED_DIR
-        dest_path_str = str(
-            event.dest_path
-        )  # TODO: change startswith to is_relative_to as well.
+        dest_path_str = str(event.dest_path)
         if Path(dest_path_str).is_relative_to(Path(TRANSFERRED_DIR)):
             if DEBUG:
                 logger.info(
