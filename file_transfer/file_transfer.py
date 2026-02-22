@@ -30,16 +30,19 @@ DEST_DIR = os.getenv("DEST_DIR")
 TRANSFERRED_DIR = os.getenv("TRANSFERRED_DIR")
 LOG_FILE = os.getenv("LOG_FILE")
 
-# TODO: If this location does not exist, we need to create it here
 if LOG_FILE:
     log_path = Path(LOG_FILE)
-    log_dir = log_path.parent  # everything except the filename
+    log_dir = log_path.parent
 
     if not log_dir.exists():
         log_dir.mkdir(parents=True, exist_ok=True)
 
 VALID_EXTENSIONS = {
     f".{ext.lower()}" for ext in os.getenv("VALID_EXTENSIONS", "").split(",") if ext
+}
+
+IGNORED_FILES = {
+    file.strip() for file in os.getenv("IGNORED_FILES", "").split(",") if file.strip()
 }
 
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"
@@ -64,6 +67,7 @@ class FileTransfer(FileSystemEventHandler):
         self.running = False
         self.transfer_lock = threading.Lock()  # Lock for transfer_file
         self.queue_lock = threading.Lock()  # Lock for queue operations
+        self.skip_specific_handler = False
 
     def start(self):
         self.running = True
@@ -104,13 +108,21 @@ class FileTransfer(FileSystemEventHandler):
             logger.info("Stopping file transfer daemon")
 
     def on_any_event(self, event: FileSystemEvent):
-        # Skip logging for .DS_Store and directory events # TODO: We should create a List of ignored extensions ow which .DS_Store is one. Also we need to determine platform and select that list accordingly
-        if os.path.basename(event.src_path) == ".DS_Store" or event.is_directory:
+        if os.path.basename(event.src_path) in IGNORED_FILES or event.is_directory:
+            self.skip_specific_handler = True
             return
+
+        self.skip_specific_handler = False
+
         if DEBUG:
             logger.info(
                 f"Event detected: type={event.event_type}, path={event.src_path}, is_directory={event.is_directory}"
             )
+
+    def dispatch(self, event: FileSystemEvent) -> None:
+        self.on_any_event(event)
+        if not self.skip_specific_handler:
+            super().dispatch(event)
 
     def on_created(self, event: FileSystemEvent):
         if event.is_directory or os.path.basename(event.src_path) == ".DS_Store":

@@ -1,4 +1,6 @@
 import time
+import pytest
+from watchdog.events import FileSystemEvent
 
 from file_transfer.file_transfer import FileTransfer
 
@@ -16,15 +18,43 @@ def test_start_leads_to_correct_state(file_transfer: FileTransfer) -> None:
 
 
 def test_stop_leads_to_correct_state(file_transfer: FileTransfer) -> None:
+    # given
     ft = file_transfer
     ft.start()
 
+    # when
     ft.stop()
 
+    # then
     assert not ft.running
-
-    deadline = time.time() + 5.0
+    buffer_sec = 5.0
+    deadline = time.time() + buffer_sec
     while ft.observer.is_alive() and time.time() < deadline:
         time.sleep(0.2)
 
-    assert not ft.observer.is_alive(), "Observer did not shut down within 12 seconds"
+    assert not ft.observer.is_alive(), (
+        f"Observer did not shut down within {buffer_sec} seconds"
+    )
+
+
+@pytest.mark.parametrize(
+    "filename,expected_skip",
+    [
+        (".DS_Store", True),
+        ("some_file.txt", False),
+    ],
+)
+def test_on_any_event_sets_skip_flag_correctly(
+    file_transfer: FileTransfer,
+    filename: str,
+    expected_skip: bool,
+) -> None:
+    # given
+    ft = file_transfer
+    event = FileSystemEvent(src_path=filename)
+
+    # when
+    ft.on_any_event(event)
+
+    # then
+    assert ft.skip_specific_handler == expected_skip
