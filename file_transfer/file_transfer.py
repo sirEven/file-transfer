@@ -127,7 +127,7 @@ class FileTransfer(FileSystemEventHandler):
     def on_created(self, event: FileSystemEvent):
         if event.is_directory or os.path.basename(event.src_path) == ".DS_Store":
             return
-        # Ignore files in TRANSFERRED_DIR
+        # Ignore files in TRANSFERRED_DIR <- move this check to on_any_event as well
         assert TRANSFERRED_DIR
         if Path(str(event.src_path)).is_relative_to(Path(TRANSFERRED_DIR)):
             if DEBUG:
@@ -158,7 +158,7 @@ class FileTransfer(FileSystemEventHandler):
     def on_moved(self, event: FileSystemEvent):
         if event.is_directory or os.path.basename(event.dest_path) == ".DS_Store":
             return
-        # Ignore files moved to TRANSFERRED_DIR
+        # Ignore files moved to TRANSFERRED_DIR <- move this check to on_any_event as well
         assert TRANSFERRED_DIR
         dest_path_str = str(event.dest_path)
         if Path(dest_path_str).is_relative_to(Path(TRANSFERRED_DIR)):
