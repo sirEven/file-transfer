@@ -18,7 +18,6 @@ from file_transfer.config import load_config
 # TODO: Rewrite this script "in maintainable" 🦾🤖...
 # TODO: Implement recursive folder handling (if not yet covered by watchdog)
 # TODO: Make bigger files work as well - e.g.: Podcasts.
-# TODO: Split .env up into a config file and true .env values
 # Load environment variables
 
 load_dotenv()
@@ -55,7 +54,9 @@ class FileTransfer(FileSystemEventHandler):
         self.observer.schedule(self, self._source_dir, recursive=False)
         self.file_queue: queue.Queue[Path] = queue.Queue()
         self.queued_files: set[Path] = set()  # Track files already in queue
-        self.transferred_files: set[Path] = set()  # Track fully transferred files
+        self.processed_files: set[Path] = (
+            set()
+        )  # Track fully processed (transferred) files
         self.running = False
         self.transfer_lock = threading.Lock()  # Lock for transfer_file
         self.queue_lock = threading.Lock()  # Lock for queue operations
@@ -89,7 +90,7 @@ class FileTransfer(FileSystemEventHandler):
                 except queue.Empty:
                     break
             self.queued_files.clear()
-            self.transferred_files.clear()
+            self.processed_files.clear()
         try:
             self.observer.join(timeout=5.0)
             self.queue_thread.join(timeout=5.0)
@@ -100,11 +101,16 @@ class FileTransfer(FileSystemEventHandler):
             self._logger.info("Stopping file transfer daemon")
 
     def on_any_event(self, event: FileSystemEvent):
+        if event.is_directory:
+            self._skip_specific_handler = True
+            if self._debug:
+                self._logger.info(
+                    f"Skipped file (part of ignore list): {event.src_path}"
+                )
+            return
+
         assert self._ignored_files
-        if (
-            os.path.basename(event.src_path) in self._ignored_files
-            or event.is_directory
-        ):
+        if os.path.basename(event.src_path) in self._ignored_files:
             self._skip_specific_handler = True
             if self._debug:
                 self._logger.info(
@@ -183,7 +189,7 @@ class FileTransfer(FileSystemEventHandler):
                     file_path = self.file_queue.get(timeout=1)
                     if self._debug:
                         self._logger.info(f"Dequeued file for processing: {file_path}")
-                    if file_path in self.transferred_files:
+                    if file_path in self.processed_files:
                         if self._debug:
                             self._logger.info(
                                 f"File already transferred, skipping: {file_path}"
@@ -204,7 +210,7 @@ class FileTransfer(FileSystemEventHandler):
                         if self._debug:
                             self._logger.info(f"Marking task done for: {file_path}")
                         self.queued_files.discard(file_path)
-                        self.transferred_files.add(file_path)
+                        self.processed_files.add(file_path)
                         self.file_queue.task_done()
             except queue.Empty:
                 continue
@@ -215,7 +221,7 @@ class FileTransfer(FileSystemEventHandler):
     def transfer_file(self, file_path: Path):
         with self.transfer_lock:  # Ensure exclusive execution
             try:
-                if file_path in self.transferred_files:
+                if file_path in self.processed_files:
                     if self._debug:
                         self._logger.info(
                             f"File already transferred, skipping: {file_path}"

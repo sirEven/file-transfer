@@ -38,6 +38,19 @@ def test_stop_leads_to_correct_state(file_transfer: FileTransfer) -> None:
     )
 
 
+def test_on_any_event_skips_directories(file_transfer: FileTransfer) -> None:
+    # given
+    ft = file_transfer
+    event = FileSystemEvent("source_path")
+    event.is_directory = True
+
+    # when
+    ft.on_any_event(event)
+
+    # then
+    assert ft._skip_specific_handler
+
+
 @pytest.mark.parametrize(
     "filename,expected_skip",
     [
