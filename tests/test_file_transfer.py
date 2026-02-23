@@ -57,7 +57,7 @@ def test_on_any_event_filters_extensions_correctly(
     ft.on_any_event(event)
 
     # then
-    assert ft.skip_specific_handler == expected_skip
+    assert ft._skip_specific_handler == expected_skip
 
 
 @pytest.mark.parametrize(
@@ -80,4 +80,4 @@ def test_on_any_event_sets_skip_flag_correctly(
     ft.on_any_event(event)
 
     # then
-    assert ft.skip_specific_handler == expected_skip
+    assert ft._skip_specific_handler == expected_skip

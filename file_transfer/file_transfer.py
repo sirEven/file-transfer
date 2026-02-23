@@ -5,14 +5,12 @@ from watchdog.events import FileSystemEventHandler, FileSystemEvent
 import shutil
 import os
 import subprocess
-from queue import Queue
 from watchdog.observers import Observer
 from watchdog.observers.api import EventDispatcher
 import logging
 import queue
 import threading
 import time
-import re
 from dotenv import load_dotenv
 
 from file_transfer.config import load_config
@@ -55,13 +53,13 @@ class FileTransfer(FileSystemEventHandler):
         assert self._source_dir
         self.observer = Observer()
         self.observer.schedule(self, self._source_dir, recursive=False)
-        self.file_queue: Queue[Path] = Queue()
+        self.file_queue: queue.Queue[Path] = queue.Queue()
         self.queued_files: set[Path] = set()  # Track files already in queue
         self.transferred_files: set[Path] = set()  # Track fully transferred files
         self.running = False
         self.transfer_lock = threading.Lock()  # Lock for transfer_file
         self.queue_lock = threading.Lock()  # Lock for queue operations
-        self.skip_specific_handler = False
+        self._skip_specific_handler = False
 
     def start(self):
         self.running = True
@@ -107,7 +105,7 @@ class FileTransfer(FileSystemEventHandler):
             os.path.basename(event.src_path) in self._ignored_files
             or event.is_directory
         ):
-            self.skip_specific_handler = True
+            self._skip_specific_handler = True
             if self._debug:
                 self._logger.info(
                     f"Skipped file that's on ignore list: {event.dest_path}"
@@ -117,7 +115,7 @@ class FileTransfer(FileSystemEventHandler):
         dest_path_str = str(event.dest_path)
         assert self._transferred_path
         if Path(dest_path_str).is_relative_to(Path(self._transferred_path)):
-            self.skip_specific_handler = True
+            self._skip_specific_handler = True
             if self._debug:
                 self._logger.info(
                     f"Skipped file that's already in transferred directory: {event.dest_path}"
@@ -128,26 +126,24 @@ class FileTransfer(FileSystemEventHandler):
         ext = Path(str(event.src_path)).suffix.lower()
 
         if ext not in self._valid_ext:
-            self.skip_specific_handler = True
+            self._skip_specific_handler = True
             if self._debug:
                 self._logger.info(
                     f"Skipped file with invalid extension: {event.src_path}"
                 )
             return
 
-        self.skip_specific_handler = False
+        self._skip_specific_handler = False
 
         if self._debug:
             self._logger.info(
                 f"Event detected: type={event.event_type}, path={event.src_path}, is_directory={event.is_directory}"
             )
 
-    def dispatch(self, event: FileSystemEvent) -> None:
-        self.on_any_event(event)
-        if not self.skip_specific_handler:
-            super().dispatch(event)
-
     def on_created(self, event: FileSystemEvent):
+        if self._skip_specific_handler:
+            return
+
         # Deduplicate before adding to queue
         with self.queue_lock:
             if (
@@ -165,6 +161,9 @@ class FileTransfer(FileSystemEventHandler):
                     self._logger.info(f"Queued file for processing: {event.src_path}")
 
     def on_moved(self, event: FileSystemEvent):
+        if self._skip_specific_handler:
+            return
+
         # Deduplicate before adding to queue
         with self.queue_lock:
             if (
@@ -285,16 +284,6 @@ class FileTransfer(FileSystemEventHandler):
                         stderr=subprocess.PIPE,
                         text=True,
                     )
-                    # Stream progress bar to console
-                    # FIXME: Currently broken, don't care atm.
-                    progress_pattern = re.compile(
-                        r"^\S+\s+\d+%\s+\S+\s+\d{2}:\d{2}$"
-                    )  # Matches "filename XX% YYYKB/s ZZ:ZZ"
-                    while process.poll() is None:
-                        assert process.stdout
-                        output = process.stdout.readline()
-                        if output and progress_pattern.match(output.strip()):
-                            print(output.strip(), end="\r")
                     returncode = process.wait()
                     assert process.stderr
                     stderr_output = process.stderr.read()
