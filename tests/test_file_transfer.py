@@ -84,7 +84,7 @@ def test_on_any_event_skips_ignored_files_correctly(
     assert ft._skip_specific_handler == expected_skip
 
 
-def test_on_any_event_skips_already_transferred_files(
+def test_on_any_event_skips_already_transferred_files_correctly(
     file_transfer: FileTransfer,
     tmp_path: Path,
 ) -> None:
@@ -92,11 +92,9 @@ def test_on_any_event_skips_already_transferred_files(
     ft = file_transfer
     transferred_dir = tmp_path / "transferred"
     fake_transferred_file = transferred_dir / "already_transferred.mp3"
-    fake_transferred_file.touch()  # Create the fake file
+    fake_transferred_file.touch()
 
-    event = FileSystemEvent(
-        src_path=str(fake_transferred_file), dest_path=str(fake_transferred_file)
-    )
+    event = FileSystemEvent(src_path=str(fake_transferred_file))
 
     # when
     ft.on_any_event(event)

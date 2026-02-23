@@ -108,17 +108,18 @@ class FileTransfer(FileSystemEventHandler):
             self._skip_specific_handler = True
             if self._debug:
                 self._logger.info(
-                    f"Skipped file that's on ignore list: {event.dest_path}"
+                    f"Skipped file (part of ignore list): {event.src_path}"
                 )
             return
 
-        dest_path_str = str(event.dest_path)
         assert self._transferred_path
-        if Path(dest_path_str).is_relative_to(Path(self._transferred_path)):
+        # Check if file was already transferred (exists in transferred_dir)
+        transferred_file = self._transferred_path / Path(str(event.src_path)).name
+        if transferred_file.exists():
             self._skip_specific_handler = True
             if self._debug:
                 self._logger.info(
-                    f"Skipped file that's already in transferred directory: {event.dest_path}"
+                    f"Skipped file (already transferred): {event.src_path}"
                 )
             return
 
@@ -128,9 +129,7 @@ class FileTransfer(FileSystemEventHandler):
         if ext not in self._valid_ext:
             self._skip_specific_handler = True
             if self._debug:
-                self._logger.info(
-                    f"Skipped file with invalid extension: {event.src_path}"
-                )
+                self._logger.info(f"Skipped file (invalid extension): {event.src_path}")
             return
 
         self._skip_specific_handler = False
@@ -144,7 +143,7 @@ class FileTransfer(FileSystemEventHandler):
         if self._skip_specific_handler:
             return
 
-        # Deduplicate before adding to queue
+        # Deduplicate before adding to queue (after created, the source should not be in queue already)
         with self.queue_lock:
             if Path(str(event.src_path)) in self.queued_files:
                 if self._debug:
@@ -161,7 +160,7 @@ class FileTransfer(FileSystemEventHandler):
         if self._skip_specific_handler:
             return
 
-        # Deduplicate before adding to queue
+        # Deduplicate before adding to queue (after move the destination should not be in queue already)
         with self.queue_lock:
             if Path(str(event.dest_path)) in self.queued_files:
                 if self._debug:
