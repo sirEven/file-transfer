@@ -146,10 +146,7 @@ class FileTransfer(FileSystemEventHandler):
 
         # Deduplicate before adding to queue
         with self.queue_lock:
-            if (
-                Path(str(event.src_path)) in self.queued_files
-                or Path(str(event.src_path)) in self.transferred_files
-            ):
+            if Path(str(event.src_path)) in self.queued_files:
                 if self._debug:
                     self._logger.info(
                         f"Skipped duplicate queue attempt: {event.src_path}"
@@ -166,10 +163,7 @@ class FileTransfer(FileSystemEventHandler):
 
         # Deduplicate before adding to queue
         with self.queue_lock:
-            if (
-                Path(str(event.dest_path)) in self.queued_files
-                or Path(str(event.dest_path)) in self.transferred_files
-            ):
+            if Path(str(event.dest_path)) in self.queued_files:
                 if self._debug:
                     self._logger.info(
                         f"Skipped duplicate queue attempt for renamed file: {event.dest_path}"

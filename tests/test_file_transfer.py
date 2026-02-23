@@ -1,3 +1,4 @@
+from pathlib import Path
 import time
 import pytest
 from watchdog.events import FileSystemEvent
@@ -44,7 +45,7 @@ def test_stop_leads_to_correct_state(file_transfer: FileTransfer) -> None:
         ("some_file.mp3", False),
     ],
 )
-def test_on_any_event_filters_extensions_correctly(
+def test_on_any_event_skips_invalid_extensions_correctly(
     file_transfer: FileTransfer,
     filename: str,
     expected_skip: bool,
@@ -67,7 +68,7 @@ def test_on_any_event_filters_extensions_correctly(
         ("some_file.wav", False),
     ],
 )
-def test_on_any_event_sets_skip_flag_correctly(
+def test_on_any_event_skips_ignored_files_correctly(
     file_transfer: FileTransfer,
     filename: str,
     expected_skip: bool,
@@ -81,3 +82,24 @@ def test_on_any_event_sets_skip_flag_correctly(
 
     # then
     assert ft._skip_specific_handler == expected_skip
+
+
+def test_on_any_event_skips_already_transferred_files(
+    file_transfer: FileTransfer,
+    tmp_path: Path,
+) -> None:
+    # given
+    ft = file_transfer
+    transferred_dir = tmp_path / "transferred"
+    fake_transferred_file = transferred_dir / "already_transferred.mp3"
+    fake_transferred_file.touch()  # Create the fake file
+
+    event = FileSystemEvent(
+        src_path=str(fake_transferred_file), dest_path=str(fake_transferred_file)
+    )
+
+    # when
+    ft.on_any_event(event)
+
+    # then
+    assert ft._skip_specific_handler

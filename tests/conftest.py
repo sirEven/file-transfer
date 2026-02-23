@@ -8,6 +8,11 @@ from file_transfer.file_transfer import FileTransfer
 
 @pytest.fixture
 def test_config(tmp_path: Path) -> Generator[Path, None, None]:
+    # Create directories
+    (tmp_path / "source").mkdir(exist_ok=True)
+    (tmp_path / "dest").mkdir(exist_ok=True)
+    (tmp_path / "transferred").mkdir(exist_ok=True)
+
     config_data: Dict[str, Any] = {
         "source_dir": str(tmp_path / "source"),
         "dest_dir": str(tmp_path / "dest"),
@@ -26,6 +31,6 @@ def test_config(tmp_path: Path) -> Generator[Path, None, None]:
 
 @pytest.fixture
 def file_transfer(test_config: Path) -> Generator[FileTransfer, None, None]:
-    ft = FileTransfer()
+    ft = FileTransfer(str(test_config))
     yield ft
     ft.stop()
