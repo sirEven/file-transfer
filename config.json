@@ -1,0 +1,9 @@
+{
+  "source_dir": "/home/eversin/Music/mp3converter",
+  "dest_dir": "/home/eversin/Music/Collection/added_music/",
+  "transferred_dir": "/home/eversin/Music/mp3converter/transferred",
+  "log_file": "logs/file_transfer.log",
+  "valid_extensions": [".mp3",".wav",".flac",".m4a",".m4p"],
+  "ignored_files": [".DS_Store"],
+  "debug": false
+}

@@ -40,8 +40,31 @@ def test_stop_leads_to_correct_state(file_transfer: FileTransfer) -> None:
 @pytest.mark.parametrize(
     "filename,expected_skip",
     [
+        ("some_file.txt", True),
+        ("some_file.mp3", False),
+    ],
+)
+def test_on_any_event_filters_extensions_correctly(
+    file_transfer: FileTransfer,
+    filename: str,
+    expected_skip: bool,
+) -> None:
+    # given
+    ft = file_transfer
+    event = FileSystemEvent(src_path=filename)
+
+    # when
+    ft.on_any_event(event)
+
+    # then
+    assert ft.skip_specific_handler == expected_skip
+
+
+@pytest.mark.parametrize(
+    "filename,expected_skip",
+    [
         (".DS_Store", True),
-        ("some_file.txt", False),
+        ("some_file.wav", False),
     ],
 )
 def test_on_any_event_sets_skip_flag_correctly(
