@@ -154,7 +154,7 @@ class FileTransfer(FileSystemEventHandler):
             if Path(str(event.src_path)) in self.queued_files:
                 if self._debug:
                     self._logger.info(
-                        f"Skipped duplicate queue attempt: {event.src_path}"
+                        f"Skipped duplicate queue attempt (create): {event.src_path}"
                     )
             else:
                 self.queued_files.add(Path(str(event.src_path)))
@@ -171,7 +171,7 @@ class FileTransfer(FileSystemEventHandler):
             if Path(str(event.dest_path)) in self.queued_files:
                 if self._debug:
                     self._logger.info(
-                        f"Skipped duplicate queue attempt for renamed file: {event.dest_path}"
+                        f"Skipped duplicate queue attempt (move): {event.dest_path}"
                     )
             else:
                 self.queued_files.add(Path(str(event.dest_path)))

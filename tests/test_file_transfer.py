@@ -114,3 +114,32 @@ def test_on_any_event_skips_already_transferred_files_correctly(
 
     # then
     assert ft._skip_specific_handler
+
+
+def test_on_created_skips_already_queued_file(file_transfer: FileTransfer) -> None:
+    # given
+    src_path = "some_silly_path"
+    ft = file_transfer
+    ft.queued_files.add(Path(src_path))
+    event = FileSystemEvent(src_path=src_path)
+
+    # when
+    ft.on_created(event)
+
+    # then
+    assert ft.file_queue.empty
+
+
+def test_on_moved_skips_already_queued_file(file_transfer: FileTransfer) -> None:
+    # given
+    src_path = "some_silly_path"
+    dest_path = "some_crazy_dest_path"
+    ft = file_transfer
+    ft.queued_files.add(Path(dest_path))
+    event = FileSystemEvent(src_path=src_path, dest_path=dest_path)
+
+    # when
+    ft.on_moved(event)
+
+    # then
+    assert ft.file_queue.empty
