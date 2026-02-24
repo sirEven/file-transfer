@@ -224,7 +224,7 @@ class FileTransfer(FileSystemEventHandler):
                 if file_path in self.processed_files:
                     if self._debug:
                         self._logger.info(
-                            f"File already transferred, skipping: {file_path}"
+                            f"File already processed, skipping: {file_path}"
                         )
                     return
                 # Check if file still exists

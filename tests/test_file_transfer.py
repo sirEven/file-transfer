@@ -97,8 +97,17 @@ def test_on_any_event_skips_ignored_files_correctly(
     assert ft._skip_specific_handler == expected_skip
 
 
+@pytest.mark.parametrize(
+    "filename,expected_skip",
+    [
+        ("already_transferred.mp3", True),
+        ("some_file.wav", False),
+    ],
+)
 def test_on_any_event_skips_already_transferred_files_correctly(
     file_transfer: FileTransfer,
+    filename: str,
+    expected_skip: bool,
     tmp_path: Path,
 ) -> None:
     # given
@@ -107,27 +116,38 @@ def test_on_any_event_skips_already_transferred_files_correctly(
     fake_transferred_file = transferred_dir / "already_transferred.mp3"
     fake_transferred_file.touch()
 
-    event = FileSystemEvent(src_path=str(fake_transferred_file))
+    event = FileSystemEvent(src_path=filename)
 
     # when
     ft.on_any_event(event)
 
     # then
-    assert ft._skip_specific_handler
+    assert ft._skip_specific_handler == expected_skip
 
 
-def test_on_created_skips_already_queued_file(file_transfer: FileTransfer) -> None:
+@pytest.mark.parametrize(
+    "filename,queue_expected_empty",
+    [
+        ("already_queued.mp3", True),
+        ("some_file.wav", False),
+    ],
+)
+def test_on_created_skips_already_queued_file(
+    file_transfer: FileTransfer,
+    filename: str,
+    queue_expected_empty: bool,
+) -> None:
     # given
-    src_path = "some_silly_path"
+    src_path = filename
     ft = file_transfer
-    ft.queued_files.add(Path(src_path))
+    ft.queued_files.add(Path("already_queued.mp3"))
     event = FileSystemEvent(src_path=src_path)
 
     # when
     ft.on_created(event)
 
     # then
-    assert ft.file_queue.empty
+    assert ft.file_queue.empty() == queue_expected_empty
 
 
 def test_on_moved_skips_already_queued_file(file_transfer: FileTransfer) -> None:
