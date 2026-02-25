@@ -13,15 +13,14 @@ from file_transfer.file_transfer import FileTransfer
 # TODO: Rewrite this script "in maintainable" 🦾🤖...
 # TODO: Implement recursive folder handling (if not yet covered by watchdog)
 # TODO: Make bigger files work as well - e.g.: Podcasts.
-# Load environment variables
-
-load_dotenv()
-# Remote Host & User
-DEST_HOST = os.getenv("DEST_HOST")
-DEST_USER = os.getenv("DEST_USER")
 
 
 class RemoteFileTransfer(FileTransfer):
+    def setup(self) -> None:
+        load_dotenv()
+        self._dest_host = os.getenv("DEST_HOST")
+        self._dest_user = os.getenv("DEST_USER")
+
     def transfer_file(self, file_path: Path):
         with self.transfer_lock:  # Ensure exclusive execution
             try:
@@ -79,7 +78,7 @@ class RemoteFileTransfer(FileTransfer):
                         "-o",
                         "StrictHostKeyChecking=no",
                         file_path,
-                        f"{DEST_USER}@{DEST_HOST}:{self._dest_dir}",
+                        f"{self._dest_user}@{self._dest_host}:{self._dest_dir}",
                     ]
                     process = subprocess.Popen(
                         scp_command,
