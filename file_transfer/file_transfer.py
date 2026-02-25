@@ -50,21 +50,19 @@ class FileTransfer(FileSystemEventHandler):
         self._logger = logging.getLogger()
 
         assert self._source_dir
-        self.observer = Observer()
-        self.observer.schedule(self, self._source_dir, recursive=False)
-        self.file_queue: queue.Queue[Path] = queue.Queue()
-        self.queued_files: set[Path] = set()  # Track files already in queue
-        self.processed_files: set[Path] = (
-            set()
-        )  # Track fully processed (transferred) files
-        self.running = False
+        self._observer = Observer()
+        self._observer.schedule(self, self._source_dir, recursive=False)
+        self._file_queue: queue.Queue[Path] = queue.Queue()
+        self._queued_files: set[Path] = set()  # Track files already in queue
+        self._processed_files: set[Path] = set()  # Track fully processed files
+        self._running = False
         self.transfer_lock = threading.Lock()  # Lock for transfer_file
-        self.queue_lock = threading.Lock()  # Lock for queue operations
+        self._queue_lock = threading.Lock()  # Lock for queue operations
         self._skip_specific_handler = False
 
     def start(self):
-        self.running = True
-        self.observer.start()
+        self._running = True
+        self._observer.start()
         # Start queue processing thread
         self.queue_thread = threading.Thread(target=self.process_queue, daemon=True)
         self.queue_thread.start()
@@ -72,27 +70,27 @@ class FileTransfer(FileSystemEventHandler):
             self._logger.info("Starting file transfer daemon")
 
     def stop(self):
-        self.running = False
+        self._running = False
         # Stop observer and unschedule all events
         try:
-            self.observer.unschedule_all()
-            self.observer.stop()
-            self.observer.event_queue.put(EventDispatcher.stop_event)
+            self._observer.unschedule_all()
+            self._observer.stop()
+            self._observer.event_queue.put(EventDispatcher.stop_event)
         except Exception as e:
             if self._debug:
                 self._logger.error(f"Error stopping observer: {str(e)}")
         # Clear queue and sets
-        with self.queue_lock:
-            while not self.file_queue.empty():
+        with self._queue_lock:
+            while not self._file_queue.empty():
                 try:
-                    self.file_queue.get_nowait()
-                    self.file_queue.task_done()
+                    self._file_queue.get_nowait()
+                    self._file_queue.task_done()
                 except queue.Empty:
                     break
-            self.queued_files.clear()
-            self.processed_files.clear()
+            self._queued_files.clear()
+            self._processed_files.clear()
         try:
-            self.observer.join(timeout=5.0)
+            self._observer.join(timeout=5.0)
             self.queue_thread.join(timeout=5.0)
         except Exception as e:
             if self._debug:
@@ -150,15 +148,15 @@ class FileTransfer(FileSystemEventHandler):
             return
 
         # Deduplicate before adding to queue (after created, the source should not be in queue already)
-        with self.queue_lock:
-            if Path(str(event.src_path)) in self.queued_files:
+        with self._queue_lock:
+            if Path(str(event.src_path)) in self._queued_files:
                 if self._debug:
                     self._logger.info(
                         f"Skipped duplicate queue attempt (create): {event.src_path}"
                     )
             else:
-                self.queued_files.add(Path(str(event.src_path)))
-                self.file_queue.put(Path(str(event.src_path)))
+                self._queued_files.add(Path(str(event.src_path)))
+                self._file_queue.put(Path(str(event.src_path)))
                 if self._debug:
                     self._logger.info(f"Queued file for processing: {event.src_path}")
 
@@ -167,51 +165,51 @@ class FileTransfer(FileSystemEventHandler):
             return
 
         # Deduplicate before adding to queue (after move the destination should not be in queue already)
-        with self.queue_lock:
-            if Path(str(event.dest_path)) in self.queued_files:
+        with self._queue_lock:
+            if Path(str(event.dest_path)) in self._queued_files:
                 if self._debug:
                     self._logger.info(
                         f"Skipped duplicate queue attempt (move): {event.dest_path}"
                     )
             else:
-                self.queued_files.add(Path(str(event.dest_path)))
-                self.file_queue.put(Path(str(event.dest_path)))
+                self._queued_files.add(Path(str(event.dest_path)))
+                self._file_queue.put(Path(str(event.dest_path)))
                 if self._debug:
                     self._logger.info(
                         f"Queued renamed file for processing: {event.dest_path}"
                     )
 
     def process_queue(self):
-        while self.running:
+        while self._running:
             try:
                 # Get next file from queue (block until one is available)
-                with self.queue_lock:
-                    file_path = self.file_queue.get(timeout=1)
+                with self._queue_lock:
+                    file_path = self._file_queue.get(timeout=1)
                     if self._debug:
                         self._logger.info(f"Dequeued file for processing: {file_path}")
-                    if file_path in self.processed_files:
+                    if file_path in self._processed_files:
                         if self._debug:
                             self._logger.info(
                                 f"File already transferred, skipping: {file_path}"
                             )
-                        self.file_queue.task_done()
+                        self._file_queue.task_done()
                         continue
-                    if file_path not in self.queued_files:
+                    if file_path not in self._queued_files:
                         if self._debug:
                             self._logger.info(
                                 f"File no longer in queued set, skipping: {file_path}"
                             )
-                        self.file_queue.task_done()
+                        self._file_queue.task_done()
                         continue
                 try:
                     self.transfer_file(file_path)
                 finally:
-                    with self.queue_lock:
+                    with self._queue_lock:
                         if self._debug:
                             self._logger.info(f"Marking task done for: {file_path}")
-                        self.queued_files.discard(file_path)
-                        self.processed_files.add(file_path)
-                        self.file_queue.task_done()
+                        self._queued_files.discard(file_path)
+                        self._processed_files.add(file_path)
+                        self._file_queue.task_done()
             except queue.Empty:
                 continue
             except Exception as e:
@@ -221,7 +219,7 @@ class FileTransfer(FileSystemEventHandler):
     def transfer_file(self, file_path: Path):
         with self.transfer_lock:  # Ensure exclusive execution
             try:
-                if file_path in self.processed_files:
+                if file_path in self._processed_files:
                     if self._debug:
                         self._logger.info(
                             f"File already processed, skipping: {file_path}"
@@ -306,7 +304,9 @@ class FileTransfer(FileSystemEventHandler):
                             time.sleep(retry_delay)
                         else:
                             raise subprocess.CalledProcessError(
-                                returncode, scp_command, stderr_output
+                                returncode,
+                                scp_command,
+                                stderr_output,
                             )
 
                 # Move file to transferred folder
