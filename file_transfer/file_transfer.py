@@ -103,7 +103,7 @@ class FileTransfer(ABC, FileSystemEventHandler):
             self._skip_specific_handler = True
             if self._debug:
                 self._logger.info(
-                    f"Skipped file (part of ignore list): {event.src_path}"
+                    f"Skipped file (not a file but a directory): {event.src_path}"
                 )
             return
 
