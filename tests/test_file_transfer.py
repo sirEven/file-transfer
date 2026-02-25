@@ -150,16 +150,27 @@ def test_on_created_skips_already_queued_file(
     assert ft.file_queue.empty() == queue_expected_empty
 
 
-def test_on_moved_skips_already_queued_file(file_transfer: FileTransfer) -> None:
+@pytest.mark.parametrize(
+    "filename,queue_expected_empty",
+    [
+        ("already_queued.mp3", True),
+        ("some_file.wav", False),
+    ],
+)
+def test_on_moved_skips_already_queued_file(
+    file_transfer: FileTransfer,
+    filename: str,
+    queue_expected_empty: bool,
+) -> None:
     # given
     src_path = "some_silly_path"
-    dest_path = "some_crazy_dest_path"
+    dest_path = filename
     ft = file_transfer
-    ft.queued_files.add(Path(dest_path))
+    ft.queued_files.add(Path("already_queued.mp3"))
     event = FileSystemEvent(src_path=src_path, dest_path=dest_path)
 
     # when
     ft.on_moved(event)
 
     # then
-    assert ft.file_queue.empty
+    assert ft.file_queue.empty() == queue_expected_empty
