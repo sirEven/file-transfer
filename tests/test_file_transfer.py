@@ -44,11 +44,12 @@ def test_on_any_event_skips_directories(file_transfer: FileTransfer) -> None:
     event = FileSystemEvent("source_path")
     event.is_directory = True
 
-    # when
+    # when on_any_event and then an additional handler is called, it skips execution
     ft.on_any_event(event)
+    ft.on_created(event)
 
     # then
-    assert ft._skip_specific_handler
+    assert ft.file_queue.empty()
 
 
 @pytest.mark.parametrize(
@@ -67,11 +68,12 @@ def test_on_any_event_skips_invalid_extensions_correctly(
     ft = file_transfer
     event = FileSystemEvent(src_path=filename)
 
-    # when
+    # when on_any_event and then an additional handler is called, it skips execution
     ft.on_any_event(event)
+    ft.on_created(event)
 
     # then
-    assert ft._skip_specific_handler == expected_skip
+    assert ft.file_queue.empty() == expected_skip
 
 
 @pytest.mark.parametrize(
@@ -90,11 +92,12 @@ def test_on_any_event_skips_ignored_files_correctly(
     ft = file_transfer
     event = FileSystemEvent(src_path=filename)
 
-    # when
+    # when on_any_event and then an additional handler is called, it skips execution
     ft.on_any_event(event)
+    ft.on_created(event)
 
     # then
-    assert ft._skip_specific_handler == expected_skip
+    assert ft.file_queue.empty() == expected_skip
 
 
 @pytest.mark.parametrize(
@@ -118,11 +121,12 @@ def test_on_any_event_skips_already_transferred_files_correctly(
 
     event = FileSystemEvent(src_path=filename)
 
-    # when
+    # when on_any_event and then an additional handler is called, it skips execution
     ft.on_any_event(event)
+    ft.on_created(event)
 
     # then
-    assert ft._skip_specific_handler == expected_skip
+    assert ft.file_queue.empty() == expected_skip
 
 
 @pytest.mark.parametrize(
