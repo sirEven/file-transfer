@@ -4,10 +4,10 @@ import pytest
 import unittest.mock as mock
 from watchdog.events import FileSystemEvent
 
-from file_transfer.file_transfer import FileTransfer
+from file_transfer.remote_file_transfer import RemoteFileTransfer
 
 
-def test_start_leads_to_correct_state(file_transfer: FileTransfer) -> None:
+def test_start_leads_to_correct_state(file_transfer: RemoteFileTransfer) -> None:
     # given
     ft = file_transfer
 
@@ -19,7 +19,7 @@ def test_start_leads_to_correct_state(file_transfer: FileTransfer) -> None:
     assert ft._observer.is_alive
 
 
-def test_stop_leads_to_correct_state(file_transfer: FileTransfer) -> None:
+def test_stop_leads_to_correct_state(file_transfer: RemoteFileTransfer) -> None:
     # given
     ft = file_transfer
     ft.start()
@@ -39,7 +39,7 @@ def test_stop_leads_to_correct_state(file_transfer: FileTransfer) -> None:
     )
 
 
-def test_on_any_event_skips_directories(file_transfer: FileTransfer) -> None:
+def test_on_any_event_skips_directories(file_transfer: RemoteFileTransfer) -> None:
     # given
     ft = file_transfer
     event = FileSystemEvent("source_path")
@@ -61,7 +61,7 @@ def test_on_any_event_skips_directories(file_transfer: FileTransfer) -> None:
     ],
 )
 def test_on_any_event_skips_invalid_extensions_correctly(
-    file_transfer: FileTransfer,
+    file_transfer: RemoteFileTransfer,
     filename: str,
     expected_skip: bool,
 ) -> None:
@@ -85,7 +85,7 @@ def test_on_any_event_skips_invalid_extensions_correctly(
     ],
 )
 def test_on_any_event_skips_ignored_files_correctly(
-    file_transfer: FileTransfer,
+    file_transfer: RemoteFileTransfer,
     filename: str,
     expected_skip: bool,
 ) -> None:
@@ -109,7 +109,7 @@ def test_on_any_event_skips_ignored_files_correctly(
     ],
 )
 def test_on_any_event_skips_already_transferred_files_correctly(
-    file_transfer: FileTransfer,
+    file_transfer: RemoteFileTransfer,
     filename: str,
     expected_skip: bool,
     tmp_path: Path,
@@ -138,7 +138,7 @@ def test_on_any_event_skips_already_transferred_files_correctly(
     ],
 )
 def test_on_created_skips_already_queued_file(
-    file_transfer: FileTransfer,
+    file_transfer: RemoteFileTransfer,
     filename: str,
     queue_expected_empty: bool,
 ) -> None:
@@ -163,7 +163,7 @@ def test_on_created_skips_already_queued_file(
     ],
 )
 def test_on_moved_skips_already_queued_file(
-    file_transfer: FileTransfer,
+    file_transfer: RemoteFileTransfer,
     filename: str,
     queue_expected_empty: bool,
 ) -> None:
@@ -182,7 +182,7 @@ def test_on_moved_skips_already_queued_file(
 
 
 def test_transfer_file_skips_already_processed_file(
-    file_transfer: FileTransfer,
+    file_transfer: RemoteFileTransfer,
 ) -> None:
     # given
     ft = file_transfer
@@ -203,7 +203,7 @@ def test_transfer_file_skips_already_processed_file(
 
 
 def test_transfer_file_handles_non_processed_file(
-    file_transfer: FileTransfer,
+    file_transfer: RemoteFileTransfer,
 ) -> None:
     # given
     ft = file_transfer
@@ -227,3 +227,6 @@ def test_transfer_file_handles_non_processed_file(
     # then
     mock_popen.assert_called()
     mock_move.assert_called()
+
+
+# TODO: write integration tests in integration dir for process_queue method.

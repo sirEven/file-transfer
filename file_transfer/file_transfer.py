@@ -1,3 +1,4 @@
+from abc import ABC
 from pathlib import Path
 from typing import List
 
@@ -26,7 +27,7 @@ DEST_HOST = os.getenv("DEST_HOST")
 DEST_USER = os.getenv("DEST_USER")
 
 
-class FileTransfer(FileSystemEventHandler):
+class FileTransfer(ABC, FileSystemEventHandler):
     def __init__(self, config_file: str = "config.json"):
 
         # Configuration

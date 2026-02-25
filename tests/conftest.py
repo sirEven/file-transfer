@@ -3,7 +3,7 @@ from typing import Any, Dict, Generator
 import json
 import pytest
 
-from file_transfer.file_transfer import FileTransfer
+from file_transfer.remote_file_transfer import RemoteFileTransfer
 
 
 @pytest.fixture
@@ -30,7 +30,7 @@ def test_config(tmp_path: Path) -> Generator[Path, None, None]:
 
 
 @pytest.fixture
-def file_transfer(test_config: Path) -> Generator[FileTransfer, None, None]:
-    ft = FileTransfer(str(test_config))
+def file_transfer(test_config: Path) -> Generator[RemoteFileTransfer, None, None]:
+    ft = RemoteFileTransfer(str(test_config))
     yield ft
     ft.stop()
